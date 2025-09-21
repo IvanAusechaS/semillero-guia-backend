@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # 🔧 Semillero GUIA - Backend API
 
 API REST del **Semillero de Investigación en Inteligencia Artificial (Semillero GUIA)** de la Universidad del Valle.
@@ -369,3 +370,7 @@ MIT License - ver [LICENSE](LICENSE) para más detalles.
 ---
 
 **Desarrollado con ❤️ por el Semillero GUIA - Universidad del Valle**
+=======
+# semillero-guia-backend
+Backend del Semillero de Investigación de la Escuela de Ingeniería de Sistemas y Computación — Universidad del Valle.
+>>>>>>> e4c43a3adfae40f5a10b57fe9c7f17f78de76a33

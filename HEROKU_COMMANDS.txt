@@ -1,0 +1,21 @@
+# COMANDOS PARA EJECUTAR EN TU TERMINAL LOCAL
+
+# 1. Configurar JWT_EXPIRES_IN en Heroku
+heroku config:set JWT_EXPIRES_IN="7d"
+
+# 2. Verificar configuración
+heroku config
+
+# 3. Desplegar los cambios
+git push heroku feature/migrate-to-mongodb:main
+
+# 4. Ver logs en tiempo real
+heroku logs --tail
+
+# 5. Probar la API
+curl -X POST https://semillero-guia-backend-0fb6e19b1407.herokuapp.com/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "test@test.com",
+    "password": "password123"
+  }'

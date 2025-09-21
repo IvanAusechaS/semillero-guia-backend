@@ -45,10 +45,33 @@ const limiter = rateLimit({
 
 // Middleware de seguridad
 app.use(helmet());
+
+// Configurar CORS para múltiples orígenes
+const allowedOrigins = [
+  'http://localhost:3000',
+  'https://semillero-guia-front.vercel.app',
+  process.env.CLIENT_URL,
+  process.env.FRONTEND_URL
+].filter(Boolean).join(',').split(',').filter(origin => origin.trim());
+
 app.use(cors({
-  origin: process.env.CLIENT_URL || "http://localhost:3000",
+  origin: function (origin, callback) {
+    // Permitir requests sin origin (como Postman) en desarrollo
+    if (!origin && process.env.NODE_ENV === 'development') {
+      return callback(null, true);
+    }
+    
+    if (allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      console.log(`🚫 CORS blocked origin: ${origin}`);
+      console.log(`✅ Allowed origins: ${allowedOrigins.join(', ')}`);
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
   credentials: true,
 }));
+
 app.use("/api/", limiter);
 
 // Middleware de logging

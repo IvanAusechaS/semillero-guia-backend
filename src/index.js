@@ -74,6 +74,27 @@ app.use((req, res, next) => {
 // Servir archivos estáticos
 app.use("/uploads", express.static(path.join(__dirname, "../uploads")));
 
+// Ruta raíz
+app.get("/", (req, res) => {
+  res.json({
+    status: "success",
+    message: "🚀 Semillero GUIA Backend API",
+    version: "1.0.0",
+    environment: process.env.NODE_ENV,
+    database: "MongoDB Atlas",
+    endpoints: {
+      auth: "/api/auth",
+      users: "/api/users", 
+      projects: "/api/projects",
+      events: "/api/events",
+      resources: "/api/resources",
+      forum: "/api/forum",
+      health: "/health"
+    },
+    documentation: "https://github.com/IvanAusechaS/semillero-guia-backend"
+  });
+});
+
 // Health check
 app.get("/health", (req, res) => {
   res.status(200).json({

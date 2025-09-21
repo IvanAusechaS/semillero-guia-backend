@@ -38,13 +38,34 @@ connectDB();
 // Configurar trust proxy para Heroku
 app.set('trust proxy', 1);
 
-// Rate limiting
+// Rate limiting - Muy permisivo para desarrollo y testing
 const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutos
-  max: 100, // máximo 100 requests por IP en 15 minutos
+  windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS) || 15 * 60 * 1000, // 15 minutos por defecto
+  max: process.env.NODE_ENV === 'production' 
+    ? parseInt(process.env.RATE_LIMIT_MAX) || 100 
+    : 10000, // 10,000 requests en desarrollo para testing completo
   message: {
     error: "Demasiadas peticiones desde esta IP, intenta de nuevo en 15 minutos.",
   },
+  standardHeaders: true, // Return rate limit info in the `RateLimit-*` headers
+  legacyHeaders: false, // Disable the `X-RateLimit-*` headers
+  // Skip rate limiting for health checks and static files
+  skip: (req) => {
+    return req.path === '/health' || 
+           req.path === '/' || 
+           req.path.startsWith('/uploads/');
+  }
+});
+
+// Rate limiter específico para autenticación - Muy permisivo para testing
+const authLimiter = rateLimit({
+  windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS) || 15 * 60 * 1000, // 15 minutos
+  max: process.env.NODE_ENV === 'production' ? 20 : 1000, // 1000 en desarrollo para testing intensivo
+  message: {
+    error: "Demasiados intentos de autenticación, intenta de nuevo en 15 minutos.",
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
 });
 
 // Middleware de seguridad
@@ -98,6 +119,7 @@ app.use(cors({
 }));
 
 app.use("/api/", limiter);
+app.use("/api/auth/", authLimiter); // Rate limiter específico para autenticación
 
 // Middleware de logging
 if (process.env.NODE_ENV === "development") {

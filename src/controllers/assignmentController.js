@@ -6,6 +6,8 @@ import AppError from '../utils/AppError.js';
 
 // GET /api/assignments/my - Obtener asignaciones del usuario actual
 const getMyAssignments = catchAsync(async (req, res, next) => {
+  console.log('🔍 getMyAssignments called with user:', req.user?._id);
+  
   const { 
     status, 
     priority, 
@@ -16,6 +18,14 @@ const getMyAssignments = catchAsync(async (req, res, next) => {
   } = req.query;
   
   const userId = req.user._id;
+
+  // Validar que el usuario esté autenticado
+  if (!userId) {
+    console.error('❌ No user ID found');
+    return next(new AppError('Usuario no autenticado', 401));
+  }
+
+  console.log('📋 Query params:', { status, priority, page, limit, project, search });
 
   // Construir filtro
   const filter = {
@@ -35,41 +45,65 @@ const getMyAssignments = catchAsync(async (req, res, next) => {
     ];
   }
 
+  console.log('🔎 Filter:', filter);
+
   // Paginación
   const pageNum = parseInt(page);
   const limitNum = parseInt(limit);
   const skip = (pageNum - 1) * limitNum;
 
-  // Consulta con populate
-  const assignments = await Assignment.find(filter)
-    .populate('project', 'title description status')
-    .populate('assignedBy', 'name email role')
-    .populate('assignedTo', 'name email')
-    .sort({ dueDate: 1, priority: -1, createdAt: -1 })
-    .limit(limitNum)
-    .skip(skip);
+  // Consulta con populate - Manejo defensivo
+  let assignments = [];
+  try {
+    console.log('📊 Fetching assignments...');
+    assignments = await Assignment.find(filter)
+      .populate('project', 'title description status')
+      .populate('assignedBy', 'name email role')
+      .populate('assignedTo', 'name email')
+      .sort({ dueDate: 1, priority: -1, createdAt: -1 })
+      .limit(limitNum)
+      .skip(skip);
+    
+    console.log('✅ Assignments found:', assignments?.length || 0);
+  } catch (error) {
+    console.error('❌ Error fetching assignments:', error);
+    return next(new AppError('Error al obtener asignaciones', 500));
+  }
 
   // Contar total para paginación
   const total = await Assignment.countDocuments(filter);
 
-  // Estadísticas adicionales
-  const stats = await Assignment.aggregate([
-    { $match: { assignedTo: userId, isActive: true } },
-    {
-      $group: {
-        _id: '$status',
-        count: { $sum: 1 }
+  // Estadísticas adicionales - Manejo defensivo
+  let stats = [];
+  try {
+    stats = await Assignment.aggregate([
+      { $match: { assignedTo: userId, isActive: true } },
+      {
+        $group: {
+          _id: '$status',
+          count: { $sum: 1 }
+        }
       }
-    }
-  ]);
+    ]);
+  } catch (error) {
+    console.error('Error fetching stats:', error);
+    stats = [];
+  }
 
-  // Próximas fechas de vencimiento
-  const upcomingDeadlines = await Assignment.getUpcomingDeadlines(userId, 7);
+  // Próximas fechas de vencimiento - Manejo defensivo
+  let upcomingDeadlines = [];
+  try {
+    const deadlines = await Assignment.getUpcomingDeadlines(userId, 7);
+    upcomingDeadlines = Array.isArray(deadlines) ? deadlines : [];
+  } catch (error) {
+    console.error('Error fetching upcoming deadlines:', error);
+    upcomingDeadlines = [];
+  }
 
   res.status(200).json({
     status: 'success',
-    results: assignments.length,
-    assignments,
+    results: assignments ? assignments.length : 0,
+    assignments: assignments || [],
     pagination: {
       page: pageNum,
       limit: limitNum,
@@ -78,10 +112,10 @@ const getMyAssignments = catchAsync(async (req, res, next) => {
       hasNextPage: pageNum < Math.ceil(total / limitNum),
       hasPrevPage: pageNum > 1
     },
-    stats: stats.reduce((acc, stat) => {
+    stats: Array.isArray(stats) ? stats.reduce((acc, stat) => {
       acc[stat._id] = stat.count;
       return acc;
-    }, {}),
+    }, {}) : {},
     upcomingDeadlines
   });
 });

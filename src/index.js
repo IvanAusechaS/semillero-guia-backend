@@ -131,10 +131,20 @@ process.on('unhandledRejection', (err) => {
   });
 });
 
-// Graceful shutdown
+// Graceful shutdown para Heroku
 process.on('SIGTERM', () => {
   console.log('👋 SIGTERM RECEIVED. Shutting down gracefully');
   server.close(() => {
     console.log('💥 Process terminated');
+    process.exit(0);
+  });
+});
+
+// Para desarrollo local (SIGINT = Ctrl+C)
+process.on('SIGINT', () => {
+  console.log('👋 SIGINT RECEIVED. Shutting down gracefully');
+  server.close(() => {
+    console.log('💥 Process terminated');
+    process.exit(0);
   });
 });

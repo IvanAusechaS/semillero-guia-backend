@@ -6,6 +6,7 @@ import morgan from "morgan";
 import rateLimit from "express-rate-limit";
 import mongoSanitize from "express-mongo-sanitize";
 import xss from "xss";
+import cookieParser from "cookie-parser";
 import path from "path";
 import { fileURLToPath } from "url";
 
@@ -16,7 +17,10 @@ import projectRoutes from "./routes/projects.js";
 import forumRoutes from "./routes/forum.js";
 import eventRoutes from "./routes/events.js";
 import resourceRoutes from "./routes/resources.js";
+import assignmentRoutes from "./routes/assignments.js";
+import submissionRoutes from "./routes/submissions.js";
 import { errorHandler } from "./middleware/errorHandler.js";
+import { handleMulterError } from "./middleware/upload.js";
 
 // Configuración para ES modules
 const __filename = fileURLToPath(import.meta.url);
@@ -49,27 +53,48 @@ app.use(helmet());
 // Configurar CORS para múltiples orígenes
 const allowedOrigins = [
   'http://localhost:3000',
+  'http://localhost:5173',
   'https://semillero-guia-front.vercel.app',
+  'https://semillero-guia-frontend.vercel.app',
   process.env.CLIENT_URL,
-  process.env.FRONTEND_URL
-].filter(Boolean).join(',').split(',').filter(origin => origin.trim());
+  process.env.FRONTEND_URL,
+  process.env.VERCEL_URL
+].filter(Boolean);
+
+// Remover duplicados y limpiar
+const uniqueOrigins = [...new Set(allowedOrigins.filter(origin => origin.trim()))];
+
+console.log('🌍 CORS configurado para:', uniqueOrigins);
 
 app.use(cors({
   origin: function (origin, callback) {
-    // Permitir requests sin origin (como Postman) en desarrollo
+    // Permitir requests sin origin (como aplicaciones móviles, Postman) en desarrollo
     if (!origin && process.env.NODE_ENV === 'development') {
       return callback(null, true);
     }
     
-    if (allowedOrigins.includes(origin)) {
+    // Verificar si el origin está en la lista permitida
+    if (uniqueOrigins.includes(origin)) {
       callback(null, true);
     } else {
       console.log(`🚫 CORS blocked origin: ${origin}`);
-      console.log(`✅ Allowed origins: ${allowedOrigins.join(', ')}`);
-      callback(new Error('Not allowed by CORS'));
+      console.log(`✅ Allowed origins: ${uniqueOrigins.join(', ')}`);
+      callback(new Error('Not allowed by CORS policy'));
     }
   },
   credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+  allowedHeaders: [
+    'Origin',
+    'X-Requested-With', 
+    'Content-Type', 
+    'Accept',
+    'Authorization',
+    'Cache-Control',
+    'X-Forwarded-For'
+  ],
+  exposedHeaders: ['Authorization'],
+  maxAge: 86400 // 24 horas
 }));
 
 app.use("/api/", limiter);
@@ -82,6 +107,7 @@ if (process.env.NODE_ENV === "development") {
 // Middleware de parsing
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true, limit: "10mb" }));
+app.use(cookieParser()); // Para manejar cookies HTTPOnly
 
 // Sanitización de datos
 app.use(mongoSanitize()); // Prevenir NoSQL injection
@@ -112,6 +138,8 @@ app.get("/", (req, res) => {
       auth: "/api/auth",
       users: "/api/users", 
       projects: "/api/projects",
+      assignments: "/api/assignments",
+      submissions: "/api/submissions",
       events: "/api/events",
       resources: "/api/resources",
       forum: "/api/forum",
@@ -121,22 +149,58 @@ app.get("/", (req, res) => {
   });
 });
 
-// Health check
-app.get("/health", (req, res) => {
-  res.status(200).json({
-    status: "success",
-    message: "Semillero GUIA API está funcionando correctamente",
-    timestamp: new Date().toISOString(),
-    uptime: process.uptime(),
-    environment: process.env.NODE_ENV,
-    version: '1.0.0'
-  });
+// Health check mejorado
+app.get("/health", async (req, res) => {
+  try {
+    // Verificar conexión a la base de datos
+    const mongoose = await import('mongoose');
+    const dbStatus = mongoose.default.connection.readyState === 1 ? 'connected' : 'disconnected';
+    
+    // Obtener información del sistema
+    const healthInfo = {
+      status: "success",
+      message: "Semillero GUIA API está funcionando correctamente",
+      timestamp: new Date().toISOString(),
+      uptime: Math.floor(process.uptime()),
+      environment: process.env.NODE_ENV,
+      version: '1.0.0',
+      database: {
+        status: dbStatus,
+        type: 'MongoDB Atlas'
+      },
+      memory: {
+        used: Math.round((process.memoryUsage().heapUsed / 1024 / 1024) * 100) / 100,
+        total: Math.round((process.memoryUsage().heapTotal / 1024 / 1024) * 100) / 100
+      },
+      pid: process.pid
+    };
+
+    // Si la base de datos no está conectada, devolver error
+    if (dbStatus === 'disconnected') {
+      return res.status(503).json({
+        ...healthInfo,
+        status: "error",
+        message: "Base de datos no disponible"
+      });
+    }
+
+    res.status(200).json(healthInfo);
+  } catch (error) {
+    res.status(500).json({
+      status: "error",
+      message: "Error interno del servidor",
+      timestamp: new Date().toISOString(),
+      error: error.message
+    });
+  }
 });
 
 // Rutas de la API
 app.use("/api/auth", authRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/projects", projectRoutes);
+app.use("/api/assignments", assignmentRoutes);
+app.use("/api/submissions", submissionRoutes);
 app.use("/api/forum", forumRoutes);
 app.use("/api/events", eventRoutes);
 app.use("/api/resources", resourceRoutes);
@@ -150,6 +214,7 @@ app.use("*", (req, res) => {
 });
 
 // Middleware de manejo de errores
+app.use(handleMulterError);
 app.use(errorHandler);
 
 // Manejo de errores no capturados

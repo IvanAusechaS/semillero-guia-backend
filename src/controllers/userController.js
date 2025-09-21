@@ -69,9 +69,7 @@ export const getAllUsers = catchAsync(async (req, res, next) => {
     );
   }
 
-  const users = await User.findAll({
-    attributes: { exclude: ["password"] },
-  });
+  const users = await User.find().select('-password');
 
   res.status(200).json({
     success: true,
@@ -109,9 +107,7 @@ export const getUserById = catchAsync(async (req, res, next) => {
 // @route   GET /api/users/:id
 // @access  Private
 export const getUser = catchAsync(async (req, res, next) => {
-  const user = await User.findByPk(req.params.id, {
-    attributes: { exclude: ["password"] },
-  });
+  const user = await User.findById(req.params.id).select('-password');
 
   if (!user) {
     return next(new AppError("Usuario no encontrado", 404));

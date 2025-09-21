@@ -18,11 +18,11 @@ router.use(protect)
 
 // Rutas para usuarios
 router.route('/')
-  .get(restrictTo('admin'), getAllUsers)
+  .get(restrictTo('admin', 'docente'), getAllUsers)
 
 router.route('/:id')
   .get(getUser)
-  .put(restrictTo('admin'), updateUser)
+  .put(restrictTo('admin', 'docente'), updateUser)
   .delete(restrictTo('admin'), deleteUser)
 
 export default router

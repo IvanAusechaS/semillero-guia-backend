@@ -47,7 +47,22 @@
     },
     {
       "key": "project_id",
-      "value": "",
+      "value": "68d031645801e1e751500c2d",
+      "type": "string"
+    },
+    {
+      "key": "project_id_2", 
+      "value": "68d031645801e1e751500c31",
+      "type": "string"
+    },
+    {
+      "key": "student_user_id",
+      "value": "68cf825b6a28695317bd421b",
+      "type": "string"
+    },
+    {
+      "key": "teacher_user_id",
+      "value": "68cf8310d67d563fccffbee9", 
       "type": "string"
     },
     {
@@ -62,6 +77,11 @@
     },
     {
       "key": "resource_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "submission_id",
       "value": "",
       "type": "string"
     }
@@ -219,6 +239,9 @@
                   "    const responseJson = pm.response.json();",
                   "    pm.expect(responseJson).to.have.property('token');",
                   "    pm.environment.set('token', responseJson.token);",
+                  "    pm.environment.set('student_token', responseJson.token);",
+                  "    pm.environment.set('user_id', responseJson.user._id);",
+                  "    pm.environment.set('student_user_id', responseJson.user._id);",
                   "});"
                 ]
               }
@@ -259,6 +282,7 @@
                   "    const responseJson = pm.response.json();",
                   "    pm.expect(responseJson).to.have.property('token');",
                   "    pm.environment.set('teacher_token', responseJson.token);",
+                  "    pm.environment.set('teacher_user_id', responseJson.user._id);",
                   "});"
                 ]
               }
@@ -380,6 +404,46 @@
       "name": "📚 Proyectos",
       "item": [
         {
+          "name": "🔍 Verificar Proyectos Existentes",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{api_url}}/projects",
+              "host": ["{{api_url}}"],
+              "path": ["projects"]
+            },
+            "description": "Verificar que los proyectos creados por seeding estén disponibles"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Projects retrieved successfully', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Projects have MongoDB ObjectIds', function () {",
+                  "    const responseJson = pm.response.json();",
+                  "    pm.expect(responseJson).to.have.property('success', true);",
+                  "    if (responseJson.data && responseJson.data.length > 0) {",
+                  "        const firstProject = responseJson.data[0];",
+                  "        pm.expect(firstProject).to.have.property('_id');",
+                  "        pm.expect(firstProject._id).to.match(/^[0-9a-fA-F]{24}$/);",
+                  "        console.log('Proyectos disponibles:');",
+                  "        responseJson.data.forEach((project, index) => {",
+                  "            console.log(`${index + 1}. ${project.title} (ID: ${project._id})`);",
+                  "        });",
+                  "    }",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
           "name": "Listar Proyectos (Público)",
           "request": {
             "method": "GET",
@@ -425,7 +489,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"title\": \"Sistema de Reconocimiento Facial con IA\",\n  \"description\": \"Desarrollo de un sistema de reconocimiento facial utilizando redes neuronales convolucionales para control de acceso en el campus universitario.\",\n  \"shortDescription\": \"Sistema de reconocimiento facial con deep learning para control de acceso.\",\n  \"technologies\": [\"Python\", \"TensorFlow\", \"OpenCV\", \"MongoDB\", \"React\"],\n  \"status\": \"en-desarrollo\",\n  \"team\": [\n    {\n      \"role\": \"Líder del Proyecto\",\n      \"name\": \"Ana García\"\n    },\n    {\n      \"role\": \"Desarrollador Backend\",\n      \"name\": \"Carlos López\"\n    }\n  ],\n  \"startDate\": \"2024-01-15\",\n  \"endDate\": \"2024-07-15\",\n  \"repositoryUrl\": \"https://github.com/semillero-guia/facial-recognition\",\n  \"featured\": true\n}"
+              "raw": "{\n  \"title\": \"Sistema de Análisis de Datos con Machine Learning\",\n  \"description\": \"Desarrollo de una plataforma de análisis de datos utilizando técnicas de machine learning para predicción y clasificación automática.\",\n  \"shortDescription\": \"Plataforma de análisis de datos con ML para predicción automática.\",\n  \"technologies\": [\"Python\", \"Scikit-learn\", \"Pandas\", \"FastAPI\", \"Vue.js\"],\n  \"status\": \"en-desarrollo\",\n  \"team\": [\n    {\n      \"user\": \"{{teacher_user_id}}\",\n      \"role\": \"Director del Proyecto\"\n    },\n    {\n      \"user\": \"{{student_user_id}}\",\n      \"role\": \"Desarrollador Full Stack\"\n    }\n  ],\n  \"startDate\": \"2024-09-01\",\n  \"endDate\": \"2025-03-01\",\n  \"repositoryUrl\": \"https://github.com/semillero-guia/data-analysis-ml\",\n  \"featured\": true\n}"
             },
             "url": {
               "raw": "{{api_url}}/projects",
@@ -447,7 +511,43 @@
                   "    const responseJson = pm.response.json();",
                   "    pm.expect(responseJson).to.have.property('success', true);",
                   "    pm.expect(responseJson.data).to.have.property('_id');",
-                  "    pm.environment.set('project_id', responseJson.data._id);",
+                  "    pm.environment.set('new_project_id', responseJson.data._id);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Obtener Asignaciones de un Proyecto",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{student_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{api_url}}/projects/{{project_id}}/assignments",
+              "host": ["{{api_url}}"],
+              "path": ["projects", "{{project_id}}", "assignments"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Project assignments retrieved', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Response has assignments for project', function () {",
+                  "    const responseJson = pm.response.json();",
+                  "    pm.expect(responseJson).to.have.property('status', 'success');",
+                  "    pm.expect(responseJson).to.have.property('assignments');",
                   "});"
                 ]
               }
@@ -457,10 +557,10 @@
       ]
     },
     {
-      "name": "📝 Foro/Tareas",
+      "name": "📝 Asignaciones",
       "item": [
         {
-          "name": "Crear Tarea (Docente)",
+          "name": "Crear Asignación (Docente)",
           "request": {
             "method": "POST",
             "header": [
@@ -475,12 +575,12 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"title\": \"Implementación de Red Neuronal Convolucional\",\n  \"description\": \"Desarrollar una CNN para clasificación de imágenes utilizando TensorFlow. Debe incluir preprocesamiento de datos, entrenamiento del modelo y evaluación de resultados.\",\n  \"instructions\": \"1. Usar el dataset CIFAR-10\\n2. Implementar una arquitectura CNN con al menos 3 capas convolucionales\\n3. Documentar el proceso en un informe PDF\\n4. Subir código fuente comentado\",\n  \"dueDate\": \"2024-11-15T23:59:59.000Z\",\n  \"maxPoints\": 100,\n  \"allowLateSubmissions\": true,\n  \"lateSubmissionPenalty\": 10,\n  \"fileTypes\": [\"pdf\", \"zip\"],\n  \"maxFileSize\": 10000000\n}"
+              "raw": "{\n  \"title\": \"Implementación de Red Neuronal Convolucional\",\n  \"description\": \"Desarrollar una CNN para clasificación de imágenes utilizando TensorFlow. Debe incluir preprocesamiento de datos, entrenamiento del modelo y evaluación de resultados.\",\n  \"project\": \"{{project_id}}\",\n  \"assignedTo\": [\"{{student_user_id}}\"],\n  \"dueDate\": \"2024-12-15T23:59:59.000Z\",\n  \"priority\": \"alta\",\n  \"instructions\": \"1. Usar el dataset CIFAR-10\\n2. Implementar una arquitectura CNN con al menos 3 capas convolucionales\\n3. Documentar el proceso en un informe PDF\\n4. Subir código fuente comentado\",\n  \"deliverables\": [\"Código fuente comentado\", \"Informe técnico en PDF\", \"Resultados experimentales\"],\n  \"estimatedHours\": 40,\n  \"maxPoints\": 100,\n  \"allowLateSubmissions\": true,\n  \"lateSubmissionPenalty\": 10,\n  \"fileTypes\": [\"pdf\", \"doc\", \"docx\", \"zip\", \"jpg\", \"png\"],\n  \"maxFileSize\": 10485760,\n  \"tags\": [\"tensorflow\", \"cnn\", \"machine-learning\"]\n}"
             },
             "url": {
-              "raw": "{{api_url}}/forum/assignments",
+              "raw": "{{api_url}}/assignments",
               "host": ["{{api_url}}"],
-              "path": ["forum", "assignments"]
+              "path": ["assignments"]
             }
           },
           "event": [
@@ -495,9 +595,9 @@
                   "",
                   "pm.test('Assignment created with ID', function () {",
                   "    const responseJson = pm.response.json();",
-                  "    pm.expect(responseJson).to.have.property('success', true);",
-                  "    pm.expect(responseJson.data).to.have.property('_id');",
-                  "    pm.environment.set('assignment_id', responseJson.data._id);",
+                  "    pm.expect(responseJson).to.have.property('status', 'success');",
+                  "    pm.expect(responseJson.assignment).to.have.property('_id');",
+                  "    pm.environment.set('assignment_id', responseJson.assignment._id);",
                   "});"
                 ]
               }
@@ -505,7 +605,7 @@
           ]
         },
         {
-          "name": "Listar Tareas (Estudiante)",
+          "name": "Mis Asignaciones (Estudiante) - CRÍTICO",
           "request": {
             "method": "GET",
             "header": [
@@ -515,9 +615,27 @@
               }
             ],
             "url": {
-              "raw": "{{api_url}}/forum/assignments",
+              "raw": "{{api_url}}/assignments/my?status=pendiente&priority=alta&page=1&limit=10",
               "host": ["{{api_url}}"],
-              "path": ["forum", "assignments"]
+              "path": ["assignments", "my"],
+              "query": [
+                {
+                  "key": "status",
+                  "value": "pendiente"
+                },
+                {
+                  "key": "priority", 
+                  "value": "alta"
+                },
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "10"
+                }
+              ]
             }
           },
           "event": [
@@ -526,13 +644,317 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "pm.test('Assignments retrieved', function () {",
+                  "pm.test('My assignments retrieved successfully', function () {",
                   "    pm.response.to.have.status(200);",
                   "});",
                   "",
-                  "pm.test('Response has assignments', function () {",
+                  "pm.test('Response has correct structure', function () {",
                   "    const responseJson = pm.response.json();",
-                  "    pm.expect(responseJson).to.have.property('success', true);",
+                  "    pm.expect(responseJson).to.have.property('status', 'success');",
+                  "    pm.expect(responseJson).to.have.property('assignments');",
+                  "    pm.expect(responseJson).to.have.property('pagination');",
+                  "    pm.expect(responseJson.pagination).to.have.property('page');",
+                  "    pm.expect(responseJson.pagination).to.have.property('total');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Obtener Asignación por ID - CRÍTICO",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{student_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{api_url}}/assignments/{{assignment_id}}",
+              "host": ["{{api_url}}"],
+              "path": ["assignments", "{{assignment_id}}"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Assignment details retrieved', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Assignment has all required fields', function () {",
+                  "    const responseJson = pm.response.json();",
+                  "    pm.expect(responseJson).to.have.property('status', 'success');",
+                  "    pm.expect(responseJson.assignment).to.have.property('_id');",
+                  "    pm.expect(responseJson.assignment).to.have.property('title');",
+                  "    pm.expect(responseJson.assignment).to.have.property('project');",
+                  "    pm.expect(responseJson.assignment).to.have.property('assignedBy');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Listar Todas las Asignaciones (Docente)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{teacher_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{api_url}}/assignments",
+              "host": ["{{api_url}}"],
+              "path": ["assignments"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('All assignments retrieved', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Response has assignments array', function () {",
+                  "    const responseJson = pm.response.json();",
+                  "    pm.expect(responseJson).to.have.property('status', 'success');",
+                  "    pm.expect(responseJson).to.have.property('assignments');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Actualizar Asignación (Docente)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{teacher_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Implementación de Red Neuronal Convolucional - Actualizada\",\n  \"priority\": \"critica\",\n  \"status\": \"en_progreso\"\n}"
+            },
+            "url": {
+              "raw": "{{api_url}}/assignments/{{assignment_id}}",
+              "host": ["{{api_url}}"],
+              "path": ["assignments", "{{assignment_id}}"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Assignment updated successfully', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Assignment has updated fields', function () {",
+                  "    const responseJson = pm.response.json();",
+                  "    pm.expect(responseJson).to.have.property('status', 'success');",
+                  "    pm.expect(responseJson.assignment.priority).to.equal('critica');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "📤 Submissions (Entregas)",
+      "item": [
+        {
+          "name": "Crear Submission - CRÍTICO",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{student_token}}"
+              }
+            ],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "assignment",
+                  "value": "{{assignment_id}}",
+                  "type": "text"
+                },
+                {
+                  "key": "content",
+                  "value": "Aquí está mi solución para la implementación de la CNN. He utilizado TensorFlow 2.0 y el dataset CIFAR-10 como se solicitó. El modelo alcanza una precisión del 85% en el conjunto de prueba.",
+                  "type": "text"
+                },
+                {
+                  "key": "attachments",
+                  "type": "file",
+                  "src": []
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{api_url}}/submissions",
+              "host": ["{{api_url}}"],
+              "path": ["submissions"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Submission created successfully', function () {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "",
+                  "pm.test('Submission has correct structure', function () {",
+                  "    const responseJson = pm.response.json();",
+                  "    pm.expect(responseJson).to.have.property('status', 'success');",
+                  "    pm.expect(responseJson.submission).to.have.property('_id');",
+                  "    pm.expect(responseJson.submission).to.have.property('assignment');",
+                  "    pm.expect(responseJson.submission).to.have.property('student');",
+                  "    pm.environment.set('submission_id', responseJson.submission._id);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Obtener Submissions de una Asignación (Docente)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{teacher_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{api_url}}/assignments/{{assignment_id}}/submissions",
+              "host": ["{{api_url}}"],
+              "path": ["assignments", "{{assignment_id}}", "submissions"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Assignment submissions retrieved', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Response has submissions array', function () {",
+                  "    const responseJson = pm.response.json();",
+                  "    pm.expect(responseJson).to.have.property('status', 'success');",
+                  "    pm.expect(responseJson).to.have.property('submissions');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Calificar Submission (Docente)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{teacher_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"grade\": 4.5,\n  \"feedback\": \"Excelente implementación de la CNN. El código está bien estructurado y comentado. Los resultados experimentales son satisfactorios. Sugerencia: explorar técnicas de data augmentation para mejorar la generalización.\",\n  \"status\": \"aprobado\"\n}"
+            },
+            "url": {
+              "raw": "{{api_url}}/submissions/{{submission_id}}/grade",
+              "host": ["{{api_url}}"],
+              "path": ["submissions", "{{submission_id}}", "grade"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Submission graded successfully', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Grade was applied correctly', function () {",
+                  "    const responseJson = pm.response.json();",
+                  "    pm.expect(responseJson).to.have.property('status', 'success');",
+                  "    pm.expect(responseJson.submission.grade).to.equal(4.5);",
+                  "    pm.expect(responseJson.submission.status).to.equal('aprobado');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Mis Submissions (Estudiante)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{student_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{api_url}}/submissions/my",
+              "host": ["{{api_url}}"],
+              "path": ["submissions", "my"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('My submissions retrieved', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Response has submissions data', function () {",
+                  "    const responseJson = pm.response.json();",
+                  "    pm.expect(responseJson).to.have.property('status', 'success');",
+                  "    pm.expect(responseJson).to.have.property('submissions');",
                   "});"
                 ]
               }
@@ -560,7 +982,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"title\": \"Workshop: Introducción a TensorFlow 2.0\",\n  \"description\": \"Taller práctico sobre los fundamentos de TensorFlow 2.0 para machine learning. Incluye ejercicios hands-on, casos de uso reales y mejores prácticas para desarrollo de modelos.\",\n  \"shortDescription\": \"Taller práctico de TensorFlow 2.0 con ejercicios hands-on.\",\n  \"type\": \"workshop\",\n  \"date\": \"2024-10-25T14:00:00.000Z\",\n  \"endDate\": \"2024-10-25T17:00:00.000Z\",\n  \"location\": \"Laboratorio de IA - Edificio 383, Sala 201\",\n  \"isVirtual\": false,\n  \"capacity\": 25,\n  \"registrationRequired\": true,\n  \"registrationDeadline\": \"2024-10-23T23:59:59.000Z\",\n  \"speakers\": [\n    {\n      \"name\": \"Dr. Carlos Rodríguez\",\n      \"bio\": \"Profesor de Machine Learning con 10 años de experiencia en TensorFlow\",\n      \"image\": \"carlos-rodriguez.jpg\"\n    }\n  ],\n  \"tags\": [\"tensorflow\", \"machine-learning\", \"python\", \"deep-learning\"],\n  \"featured\": true\n}"
+              "raw": "{\n  \"title\": \"Workshop: Introducción a TensorFlow 2.0\",\n  \"description\": \"Taller práctico sobre los fundamentos de TensorFlow 2.0 para machine learning. Incluye ejercicios hands-on, casos de uso reales y mejores prácticas para desarrollo de modelos.\",\n  \"shortDescription\": \"Taller práctico de TensorFlow 2.0 con ejercicios hands-on.\",\n  \"type\": \"workshop\",\n  \"date\": \"2024-10-25\",\n  \"time\": \"14:00\",\n  \"duration\": \"3 horas\",\n  \"location\": \"Laboratorio de IA - Edificio 383, Sala 201\",\n  \"instructor\": \"Dr. Carlos Rodríguez\",\n  \"capacity\": 25,\n  \"tags\": [\"tensorflow\", \"machine-learning\", \"python\", \"deep-learning\"],\n  \"requirements\": [\"Conocimientos básicos de Python\", \"Laptop personal\"]\n}"
             },
             "url": {
               "raw": "{{api_url}}/events",

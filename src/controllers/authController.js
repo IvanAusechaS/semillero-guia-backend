@@ -14,14 +14,25 @@ const generateToken = (id) => {
 const sendTokenResponse = async (user, statusCode, res, message) => {
   const token = generateToken(user._id);
 
+  // Configurar opciones de cookie
+  const cookieOptions = {
+    expires: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 días
+    httpOnly: true, // La cookie no es accesible desde JavaScript del cliente
+    secure: process.env.NODE_ENV === 'production', // Solo HTTPS en producción
+    sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax', // Para CORS en producción
+  };
+
   // Actualizar último login
   user.lastLogin = new Date();
   await user.save({ validateBeforeSave: false });
 
+  // Establecer cookie HTTPOnly
+  res.cookie('jwt', token, cookieOptions);
+
   res.status(statusCode).json({
     status: "success",
     message,
-    token,
+    token, // Mantener token en respuesta para compatibilidad
     user: user.toPublicJSON(),
   });
 };
@@ -176,6 +187,14 @@ export const changePassword = catchAsync(async (req, res, next) => {
 // @route   POST /api/auth/logout
 // @access  Private
 export const logout = catchAsync(async (req, res, next) => {
+  // Limpiar cookie HTTPOnly
+  res.cookie('jwt', 'loggedout', {
+    expires: new Date(Date.now() + 10 * 1000), // Expira en 10 segundos
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+  });
+
   res.status(200).json({
     status: "success",
     message: "Sesión cerrada exitosamente",

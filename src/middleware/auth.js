@@ -7,12 +7,16 @@ import catchAsync from "../utils/catchAsync.js";
 export const protect = catchAsync(async (req, res, next) => {
   let token;
 
-  // 1) Obtener token del header
+  // 1) Obtener token del header o cookies
   if (
     req.headers.authorization &&
     req.headers.authorization.startsWith("Bearer")
   ) {
+    // Obtener token del header Authorization
     token = req.headers.authorization.split(" ")[1];
+  } else if (req.cookies && req.cookies.jwt) {
+    // Obtener token de cookie HTTPOnly
+    token = req.cookies.jwt;
   }
 
   // 2) Verificar que existe el token

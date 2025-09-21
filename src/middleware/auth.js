@@ -27,7 +27,7 @@ export const protect = catchAsync(async (req, res, next) => {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
     // 4) Verificar que el usuario aún existe
-    const user = await User.findByPk(decoded.id);
+    const user = await User.findById(decoded.id).select('+password');
     if (!user) {
       return next(new AppError("El usuario del token ya no existe", 401));
     }
@@ -63,9 +63,9 @@ export const restrictTo = (...roles) => {
 };
 
 // Middleware para verificar propietario del recurso
-export const checkOwnership = (Model, paramField = "id") => {
+export const checkOwnership = (Model, paramField = "_id") => {
   return catchAsync(async (req, res, next) => {
-    const resource = await Model.findByPk(req.params[paramField]);
+    const resource = await Model.findById(req.params[paramField]);
 
     if (!resource) {
       return next(new AppError("Recurso no encontrado", 404));
@@ -73,8 +73,8 @@ export const checkOwnership = (Model, paramField = "id") => {
 
     // Solo el propietario o admin puede acceder
     if (
-      resource.userId &&
-      resource.userId.toString() !== req.user.id &&
+      resource.createdBy &&
+      resource.createdBy.toString() !== req.user._id.toString() &&
       req.user.role !== "admin"
     ) {
       return next(

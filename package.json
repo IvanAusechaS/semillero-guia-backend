@@ -8,36 +8,93 @@
     "dev": "nodemon src/index.js",
     "start": "node src/index.js",
     "build": "echo 'No build step required'",
-    "test": "echo 'No tests specified' && exit 1"
+    "test": "echo 'No tests specified' && exit 1",
+    "lint": "eslint src/",
+    "lint:fix": "eslint src/ --fix",
+    "seed": "node src/scripts/seedDatabase.js"
   },
   "keywords": [
     "nodejs",
     "express",
-    "sqlite",
-    "sequelize",
+    "mongodb",
+    "mongoose",
     "api",
     "jwt",
     "semillero",
-    "inteligencia-artificial"
+    "inteligencia-artificial",
+    "rest-api",
+    "backend"
   ],
-  "author": "Semillero GUIA",
+  "author": "Semillero GUIA - Universidad del Valle",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/IvanAusechaS/semillero-guia-backend.git"
+  },
+  "bugs": {
+    "url": "https://github.com/IvanAusechaS/semillero-guia-backend/issues"
+  },
+  "homepage": "https://github.com/IvanAusechaS/semillero-guia-backend#readme",
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=8.0.0"
+  },
   "dependencies": {
     "bcryptjs": "^2.4.3",
     "cors": "^2.8.5",
     "dotenv": "^16.3.1",
     "express": "^4.18.2",
-    "express-rate-limit": "^6.10.0",
+    "express-mongo-sanitize": "^2.2.0",
+    "express-rate-limit": "^7.1.5",
     "express-validator": "^7.0.1",
-    "helmet": "^7.0.0",
+    "helmet": "^7.1.0",
     "jsonwebtoken": "^9.0.2",
+    "mongodb": "^6.3.0",
+    "mongoose": "^8.18.1",
     "morgan": "^1.10.0",
     "multer": "^1.4.5-lts.1",
-    "sequelize": "^6.37.7",
-    "sqlite3": "^5.1.7",
-    "xss-clean": "^0.1.4"
+    "xss": "^1.0.15"
   },
   "devDependencies": {
-    "nodemon": "^3.0.1"
+    "eslint": "^8.55.0",
+    "eslint-config-node": "^4.1.0",
+    "eslint-config-prettier": "^9.1.0",
+    "eslint-plugin-node": "^11.1.0",
+    "nodemon": "^3.0.2",
+    "prettier": "^3.1.0"
+  },
+  "eslintConfig": {
+    "extends": [
+      "node",
+      "prettier"
+    ],
+    "parserOptions": {
+      "ecmaVersion": 2022,
+      "sourceType": "module"
+    },
+    "env": {
+      "node": true,
+      "es2022": true
+    },
+    "rules": {
+      "no-console": "warn",
+      "no-unused-vars": "error",
+      "prefer-const": "error"
+    }
+  },
+  "prettier": {
+    "semi": true,
+    "singleQuote": true,
+    "tabWidth": 2,
+    "trailingComma": "es5",
+    "printWidth": 100
+  },
+  "nodemonConfig": {
+    "ignore": [
+      "uploads/*",
+      "*.test.js",
+      "node_modules/*"
+    ],
+    "delay": "1000"
   }
 }

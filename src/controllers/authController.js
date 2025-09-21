@@ -11,11 +11,12 @@ const generateToken = (id) => {
 };
 
 // Enviar respuesta con token
-const sendTokenResponse = (user, statusCode, res, message) => {
-  const token = generateToken(user.id);
+const sendTokenResponse = async (user, statusCode, res, message) => {
+  const token = generateToken(user._id);
 
   // Actualizar último login
-  user.update({ lastLogin: new Date() });
+  user.lastLogin = new Date();
+  await user.save({ validateBeforeSave: false });
 
   res.status(statusCode).json({
     status: "success",
@@ -33,7 +34,7 @@ export const register = catchAsync(async (req, res, next) => {
     req.body;
 
   // Verificar si el usuario ya existe
-  const existingUser = await User.findOne({ where: { email } });
+  const existingUser = await User.findOne({ email });
   if (existingUser) {
     return next(new AppError("El usuario ya existe con este email", 400));
   }
@@ -45,7 +46,7 @@ export const register = catchAsync(async (req, res, next) => {
     password,
     role,
     career,
-    roleInSemillero: roleInSemillero || "Miembro",
+    roleInSemillero: roleInSemillero || "miembro",
   };
 
   // Solo agregar semestre si el rol es estudiante
@@ -55,7 +56,7 @@ export const register = catchAsync(async (req, res, next) => {
 
   const user = await User.create(userData);
 
-  sendTokenResponse(user, 201, res, "Usuario registrado exitosamente");
+  await sendTokenResponse(user, 201, res, "Usuario registrado exitosamente");
 });
 
 // @desc    Iniciar sesión
@@ -64,8 +65,8 @@ export const register = catchAsync(async (req, res, next) => {
 export const login = catchAsync(async (req, res, next) => {
   const { email, password } = req.body;
 
-  // Buscar usuario
-  const user = await User.findOne({ where: { email } });
+  // Buscar usuario con password incluido
+  const user = await User.findOne({ email }).select('+password');
 
   if (!user) {
     return next(new AppError("Credenciales inválidas", 401));
@@ -87,14 +88,18 @@ export const login = catchAsync(async (req, res, next) => {
     );
   }
 
-  sendTokenResponse(user, 200, res, "Inicio de sesión exitoso");
+  await sendTokenResponse(user, 200, res, "Inicio de sesión exitoso");
 });
 
 // @desc    Obtener usuario actual
 // @route   GET /api/auth/me
 // @access  Private
 export const getMe = catchAsync(async (req, res, next) => {
-  const user = await User.findById(req.user.id);
+  const user = await User.findById(req.user._id);
+
+  if (!user) {
+    return next(new AppError("Usuario no encontrado", 404));
+  }
 
   res.status(200).json({
     status: "success",
@@ -122,10 +127,14 @@ export const updateProfile = catchAsync(async (req, res, next) => {
     }
   });
 
-  const user = await User.findByIdAndUpdate(req.user.id, updates, {
+  const user = await User.findByIdAndUpdate(req.user._id, updates, {
     new: true,
     runValidators: true,
   });
+
+  if (!user) {
+    return next(new AppError("Usuario no encontrado", 404));
+  }
 
   res.status(200).json({
     status: "success",
@@ -141,7 +150,11 @@ export const changePassword = catchAsync(async (req, res, next) => {
   const { currentPassword, newPassword } = req.body;
 
   // Obtener usuario con password
-  const user = await User.findById(req.user.id).select("+password");
+  const user = await User.findById(req.user._id).select("+password");
+
+  if (!user) {
+    return next(new AppError("Usuario no encontrado", 404));
+  }
 
   // Verificar contraseña actual
   const isCurrentPasswordValid = await user.comparePassword(currentPassword);

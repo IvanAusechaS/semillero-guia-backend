@@ -4,7 +4,8 @@ import dotenv from "dotenv";
 import helmet from "helmet";
 import morgan from "morgan";
 import rateLimit from "express-rate-limit";
-import xss from "xss-clean";
+import mongoSanitize from "express-mongo-sanitize";
+import xss from "xss";
 import path from "path";
 import { fileURLToPath } from "url";
 
@@ -30,35 +31,45 @@ const app = express();
 // Conectar a la base de datos
 connectDB();
 
-// Middleware de seguridad
-app.use(helmet());
-app.use(
-  cors({
-    origin: process.env.CLIENT_URL || "http://localhost:3000",
-    credentials: true,
-  })
-);
-
 // Rate limiting
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutos
   max: 100, // máximo 100 requests por IP en 15 minutos
   message: {
-    error:
-      "Demasiadas peticiones desde esta IP, intenta de nuevo en 15 minutos.",
+    error: "Demasiadas peticiones desde esta IP, intenta de nuevo en 15 minutos.",
   },
 });
+
+// Middleware de seguridad
+app.use(helmet());
+app.use(cors({
+  origin: process.env.CLIENT_URL || "http://localhost:3000",
+  credentials: true,
+}));
 app.use("/api/", limiter);
 
-// Middleware de parsing y sanitización
-app.use(express.json({ limit: "10mb" }));
-app.use(express.urlencoded({ extended: true, limit: "10mb" }));
-app.use(xss());
-
-// Logging
+// Middleware de logging
 if (process.env.NODE_ENV === "development") {
   app.use(morgan("dev"));
 }
+
+// Middleware de parsing
+app.use(express.json({ limit: "10mb" }));
+app.use(express.urlencoded({ extended: true, limit: "10mb" }));
+
+// Sanitización de datos
+app.use(mongoSanitize()); // Prevenir NoSQL injection
+app.use((req, res, next) => {
+  // Sanitizar contra XSS
+  if (req.body) {
+    Object.keys(req.body).forEach(key => {
+      if (typeof req.body[key] === 'string') {
+        req.body[key] = xss(req.body[key]);
+      }
+    });
+  }
+  next();
+});
 
 // Servir archivos estáticos
 app.use("/uploads", express.static(path.join(__dirname, "../uploads")));
@@ -70,6 +81,8 @@ app.get("/health", (req, res) => {
     message: "Semillero GUIA API está funcionando correctamente",
     timestamp: new Date().toISOString(),
     uptime: process.uptime(),
+    environment: process.env.NODE_ENV,
+    version: '1.0.0'
   });
 });
 
@@ -92,12 +105,36 @@ app.use("*", (req, res) => {
 // Middleware de manejo de errores
 app.use(errorHandler);
 
+// Manejo de errores no capturados
+process.on('uncaughtException', (err) => {
+  console.log('UNCAUGHT EXCEPTION! 💥 Shutting down...');
+  console.log(err.name, err.message);
+  process.exit(1);
+});
+
 // Configurar puerto
 const PORT = process.env.PORT || 4000;
 
 // Iniciar servidor
-app.listen(PORT, () => {
+const server = app.listen(PORT, () => {
   console.log(`🚀 Servidor corriendo en puerto ${PORT}`);
   console.log(`🏥 Health check disponible en http://localhost:${PORT}/health`);
   console.log(`🌍 Entorno: ${process.env.NODE_ENV || "development"}`);
+});
+
+// Manejo de promesas rechazadas no capturadas
+process.on('unhandledRejection', (err) => {
+  console.log('UNHANDLED REJECTION! 💥 Shutting down...');
+  console.log(err.name, err.message);
+  server.close(() => {
+    process.exit(1);
+  });
+});
+
+// Graceful shutdown
+process.on('SIGTERM', () => {
+  console.log('👋 SIGTERM RECEIVED. Shutting down gracefully');
+  server.close(() => {
+    console.log('💥 Process terminated');
+  });
 });

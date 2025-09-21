@@ -1,32 +1,16 @@
-import { Sequelize } from "sequelize";
-import path from "path";
-import { fileURLToPath } from "url";
+import mongoose from 'mongoose';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
-// Configurar SQLite
-const sequelize = new Sequelize({
-  dialect: "sqlite",
-  storage: path.join(__dirname, "../../database.sqlite"),
-  logging: process.env.NODE_ENV === "development" ? console.log : false,
-  define: {
-    timestamps: true,
-    underscored: false,
-  },
-});
-
-// Función para conectar a la base de datos
+// Función para conectar a MongoDB
 const connectDB = async () => {
   try {
-    await sequelize.authenticate();
-    console.log("✅ Conectado a SQLite exitosamente");
+    const conn = await mongoose.connect(process.env.MONGODB_URI);
 
-    // Sincronizar modelos (crear tablas si no existen)
-    await sequelize.sync({ alter: true });
-    console.log("📋 Tablas sincronizadas");
+    console.log(`✅ MongoDB Connected: ${conn.connection.host}`);
+    console.log(`📋 Database: ${conn.connection.name}`);
+    
+    return conn;
   } catch (error) {
-    console.error("❌ Error conectando a SQLite:", error.message);
+    console.error('❌ Error conectando a MongoDB:', error.message);
     process.exit(1);
   }
 };
@@ -34,12 +18,31 @@ const connectDB = async () => {
 // Función para cerrar la conexión
 export const closeDB = async () => {
   try {
-    await sequelize.close();
-    console.log("🔒 Conexión a SQLite cerrada");
+    await mongoose.connection.close();
+    console.log('🔒 Conexión a MongoDB cerrada');
   } catch (error) {
-    console.error("❌ Error cerrando conexión:", error.message);
+    console.error('❌ Error cerrando conexión:', error.message);
   }
 };
 
-export { sequelize };
+// Manejo de eventos de conexión
+mongoose.connection.on('connected', () => {
+  console.log('🟢 Mongoose connected to MongoDB');
+});
+
+mongoose.connection.on('error', (err) => {
+  console.error('🔴 Mongoose connection error:', err);
+});
+
+mongoose.connection.on('disconnected', () => {
+  console.log('🟡 Mongoose disconnected from MongoDB');
+});
+
+// Graceful shutdown
+process.on('SIGINT', async () => {
+  await mongoose.connection.close();
+  console.log('🔒 MongoDB connection closed through app termination');
+  process.exit(0);
+});
+
 export default connectDB;

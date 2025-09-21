@@ -1,144 +1,174 @@
-import { DataTypes } from "sequelize";
-import { sequelize } from "../config/database.js";
+import mongoose from "mongoose";
 import bcrypt from "bcryptjs";
 
-const User = sequelize.define(
-  "User",
+const userSchema = new mongoose.Schema(
   {
-    id: {
-      type: DataTypes.INTEGER,
-      primaryKey: true,
-      autoIncrement: true,
-    },
     name: {
-      type: DataTypes.STRING,
-      allowNull: false,
-      validate: {
-        len: [2, 100],
-      },
+      type: String,
+      required: [true, "Name is required"],
+      trim: true,
+      maxlength: [100, "Name cannot exceed 100 characters"],
     },
     email: {
-      type: DataTypes.STRING,
-      allowNull: false,
+      type: String,
+      required: [true, "Email is required"],
       unique: true,
-      validate: {
-        isEmail: true,
-      },
+      lowercase: true,
+      match: [
+        /^\w+([.-]?\w+)*@\w+([.-]?\w+)*(\.\w{2,3})+$/,
+        "Please enter a valid email",
+      ],
     },
     password: {
-      type: DataTypes.STRING,
-      allowNull: false,
-      validate: {
-        len: [6, 255],
-      },
+      type: String,
+      required: [true, "Password is required"],
+      minlength: [6, "Password must be at least 6 characters"],
+      select: false,
     },
     role: {
-      type: DataTypes.ENUM("estudiante", "docente", "admin"),
-      defaultValue: "estudiante",
+      type: String,
+      enum: ["estudiante", "docente", "admin"],
+      default: "estudiante",
     },
     career: {
-      type: DataTypes.STRING,
-      allowNull: false,
+      type: String,
+      required: function () {
+        return this.role === "estudiante";
+      },
+      trim: true,
     },
     semester: {
-      type: DataTypes.INTEGER,
-      allowNull: true,
-      validate: {
-        min: 1,
-        max: 12,
+      type: Number,
+      required: function () {
+        return this.role === "estudiante";
       },
+      min: [1, "Semester must be at least 1"],
+      max: [12, "Semester cannot exceed 12"],
     },
     roleInSemillero: {
-      type: DataTypes.STRING,
-      defaultValue: "Miembro",
+      type: String,
+      enum: ["miembro", "coordinador", "investigador", "mentor"],
+      default: "miembro",
     },
     bio: {
-      type: DataTypes.TEXT,
-      allowNull: true,
-      validate: {
-        len: [0, 500],
+      type: String,
+      maxlength: [500, "Bio cannot exceed 500 characters"],
+    },
+    skills: [
+      {
+        type: String,
+        trim: true,
+      },
+    ],
+    socialLinks: {
+      github: {
+        type: String,
+        match: [
+          /^https?:\/\/(www\.)?github\.com\/[\w-]+$/,
+          "Please enter a valid GitHub URL",
+        ],
+      },
+      linkedin: {
+        type: String,
+        match: [
+          /^https?:\/\/(www\.)?linkedin\.com\/in\/[\w-]+$/,
+          "Please enter a valid LinkedIn URL",
+        ],
+      },
+      researchgate: {
+        type: String,
+        match: [
+          /^https?:\/\/(www\.)?researchgate\.net\/profile\/[\w-]+$/,
+          "Please enter a valid ResearchGate URL",
+        ],
       },
     },
-    skills: {
-      type: DataTypes.JSON,
-      defaultValue: [],
-    },
-    socialLinks: {
-      type: DataTypes.JSON,
-      defaultValue: {},
-    },
     profileImage: {
-      type: DataTypes.STRING,
-      allowNull: true,
+      type: String,
+      default: null,
     },
     isActive: {
-      type: DataTypes.BOOLEAN,
-      defaultValue: true,
+      type: Boolean,
+      default: true,
     },
     joinDate: {
-      type: DataTypes.DATE,
-      defaultValue: DataTypes.NOW,
+      type: Date,
+      default: Date.now,
     },
     lastLogin: {
-      type: DataTypes.DATE,
-      defaultValue: DataTypes.NOW,
+      type: Date,
+      default: null,
     },
   },
   {
-    tableName: "users",
-    indexes: [
-      {
-        unique: true,
-        fields: ["email"],
-      },
-      {
-        fields: ["role"],
-      },
-      {
-        fields: ["isActive"],
-      },
-    ],
-    hooks: {
-      beforeCreate: async (user) => {
-        if (user.password) {
-          const salt = await bcrypt.genSalt(12);
-          user.password = await bcrypt.hash(user.password, salt);
-        }
-      },
-      beforeUpdate: async (user) => {
-        if (user.changed("password")) {
-          const salt = await bcrypt.genSalt(12);
-          user.password = await bcrypt.hash(user.password, salt);
-        }
-      },
-    },
+    timestamps: true,
+    toJSON: { virtuals: true },
+    toObject: { virtuals: true },
   }
 );
 
-// Método de instancia para comparar contraseñas
-User.prototype.comparePassword = async function (candidatePassword) {
+// Indices
+userSchema.index({ email: 1 });
+userSchema.index({ role: 1 });
+userSchema.index({ isActive: 1 });
+
+// Virtual para URL completa de imagen de perfil
+userSchema.virtual("profileImageUrl").get(function () {
+  return this.profileImage
+    ? `${process.env.CLIENT_URL}/uploads/profiles/${this.profileImage}`
+    : null;
+});
+
+// Middleware para hashear password antes de guardar
+userSchema.pre("save", async function (next) {
+  if (!this.isModified("password")) return next();
+
+  this.password = await bcrypt.hash(this.password, 12);
+  next();
+});
+
+// Método para comparar passwords
+userSchema.methods.comparePassword = async function (candidatePassword) {
   return await bcrypt.compare(candidatePassword, this.password);
 };
 
-// Método para obtener datos públicos del usuario
-User.prototype.toPublicJSON = function () {
-  const user = this.toJSON();
+// Método para actualizar último login (simplificado)
+userSchema.methods.updateLastLogin = async function () {
+  this.lastLogin = new Date();
+  return await this.save({ validateBeforeSave: false });
+};
+
+// Método para obtener datos públicos del usuario (sin password)
+userSchema.methods.toPublicJSON = function () {
+  const user = this.toObject();
   delete user.password;
+  delete user.__v;
   return user;
 };
 
-// Método virtual para perfil completo
-User.prototype.getFullProfile = function () {
+// Método para obtener perfil completo (para el usuario autenticado)
+userSchema.methods.getFullProfile = function () {
   return {
-    id: this.id,
+    _id: this._id,
     name: this.name,
     email: this.email,
     role: this.role,
     career: this.career,
     semester: this.semester,
     roleInSemillero: this.roleInSemillero,
+    bio: this.bio,
+    skills: this.skills,
+    socialLinks: this.socialLinks,
     profileImage: this.profileImage,
+    profileImageUrl: this.profileImageUrl,
+    isActive: this.isActive,
+    joinDate: this.joinDate,
+    lastLogin: this.lastLogin,
+    createdAt: this.createdAt,
+    updatedAt: this.updatedAt
   };
 };
+
+const User = mongoose.model("User", userSchema);
 
 export default User;
